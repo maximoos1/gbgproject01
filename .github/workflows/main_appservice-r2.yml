@@ -1,7 +1,7 @@
 # Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
 # More GitHub Actions for Azure: https://github.com/Azure/actions
 
-name: Build and deploy Python app to Azure Web App - appservice-r2
+name: Build and deploy ASP.Net Core app to Azure Web App - appservice-r2
 
 on:
   push:
@@ -10,40 +10,57 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: windows-latest
     permissions:
-      id-token: write #This is required for requesting the JWT
       contents: read #This is required for actions/checkout
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python version
-        uses: actions/setup-python@v5
+      - name: Set up .NET Core
+        uses: actions/setup-dotnet@v4
         with:
-          python-version: ''
+          dotnet-version: '8.x'
 
-      - name: Install Python dependencies
-        run: |
-          python -m venv env
-          .\\env\\Scripts\\activate
-          pip install -r requirements.txt
+      - name: Build with dotnet
+        run: dotnet build --configuration Release
 
-      - name: Zip the application files
-        run: Compress-Archive .\\* app.zip
+      - name: dotnet publish
+        run: dotnet publish -c Release -o "${{env.DOTNET_ROOT}}/myapp"
+
+      - name: Upload artifact for deployment job
+        uses: actions/upload-artifact@v4
+        with:
+          name: .net-app
+          path: ${{env.DOTNET_ROOT}}/myapp
+
+  deploy:
+    runs-on: windows-latest
+    needs: build
+    
+    permissions:
+      id-token: write #This is required for requesting the JWT
+      contents: read #This is required for actions/checkout
+
+    steps:
+      - name: Download artifact from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: .net-app
       
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_77B34D34783A4CA1A8EC7B07A1A24335 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_727E7B9538A648FBB99BA6D8B163680F }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_B2E934E818584796A07D39887CBE0949 }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_58060320FCE94CC5BB54A21F43A3DEED }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_9292C1AB75064AC99FF54EA02DDEAADD }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_F3E7E7E41A864EB79F53F29839A6F6EA }}
 
-      - name: 'Deploy to Azure Web App'
+      - name: Deploy to Azure Web App
+        id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'appservice-r2'
           slot-name: 'Production'
-          package: '.\\app.zip'
+          package: .
           
